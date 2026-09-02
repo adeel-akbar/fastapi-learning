@@ -1,6 +1,6 @@
 from random import randrange
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Response, status
 from pydantic import BaseModel
 
 app = FastAPI()
@@ -11,6 +11,11 @@ def find_post(id):
     for post in new_posts:
         if post['id'] == id:
             return post
+
+def find_index(id):
+    for i, post in enumerate(new_posts):
+        if post["id"] == id:
+            return i
 class Post(BaseModel):
     title: str
     content: str
@@ -39,3 +44,26 @@ def get_post(id: int):     # rather then showing nothing.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                              detail=f"The post with id: {id} isn't available")
     return {"data": post}
+
+# Delete a post. But for that first we have to find the index of that post
+# using a function.
+@app.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post(id: int):
+    index = find_index(id)
+    if index is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"The post with id: {id} isn't available")
+    new_posts.pop(index)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+# Updating a post. Using find_index() function. 
+@app.put("/posts/{id}")
+def update_post(id: int, post: Post):
+    index = find_index(id)
+    if index is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail=f"The post with id: {id} isn't available")
+    post_dict = post.model_dump()
+    post_dict["id"] = id
+    new_posts[index] = post_dict
+    return {"data": post_dict}
