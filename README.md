@@ -9,7 +9,7 @@ This repository documents my learning journey through concepts, practice exercis
 - [x] FastAPI Basics
 - [x] HTTP, Postman & Pydantic
 - [x] CRUD & API Features
-- [ ] PostgreSQL & SQL
+- [x] PostgreSQL & SQL
 - [ ] Database with Python
 - [ ] SQLAlchemy & ORM
 - [ ] Users & Authentication
@@ -44,6 +44,19 @@ This repository documents my learning journey through concepts, practice exercis
 - Used FastAPI automatic API documentation
 - Organized the application using a Python package
 - Tested API endpoints using Postman
+
+### Chapter 3 — PostgreSQL & SQL
+
+- Learned database fundamentals and why databases are used in backend applications
+- Learned PostgreSQL and database schemas/tables
+- Practiced working with PostgreSQL through pgAdmin
+- Learned basic SQL queries
+- Practiced filtering data using `WHERE`
+- Learned SQL operators
+- Used `IN` and `LIKE`
+- Practiced ordering results with `ORDER BY`
+- Learned `LIMIT` and `OFFSET`
+- Practiced modifying data using SQL
 
 ## Postman
 
