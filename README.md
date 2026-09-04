@@ -10,7 +10,7 @@ This repository documents my learning journey through concepts, practice exercis
 - [x] HTTP, Postman & Pydantic
 - [x] CRUD & API Features
 - [x] PostgreSQL & SQL
-- [ ] Database with Python
+- [x] Database with Python
 - [ ] SQLAlchemy & ORM
 - [ ] Users & Authentication
 - [ ] Relationships & Advanced Queries
@@ -57,6 +57,20 @@ This repository documents my learning journey through concepts, practice exercis
 - Practiced ordering results with `ORDER BY`
 - Learned `LIMIT` and `OFFSET`
 - Practiced modifying data using SQL
+
+### Chapter 4 — Database with Python
+
+- Connected Python to PostgreSQL using Psycopg
+- Learned how database connections and cursors work
+- Executed SQL queries from Python
+- Retrieved database records using `fetchone()` and `fetchall()`
+- Used `dict_row` to return database rows as dictionaries
+- Used environment variables for database credentials
+- Implemented database-backed GET, POST, PUT, and DELETE endpoints
+- Used parameterized SQL queries
+- Learned how to commit database changes
+- Handled missing records with `HTTPException`
+- Connected the FastAPI API to a PostgreSQL database
 
 ## Postman
 
