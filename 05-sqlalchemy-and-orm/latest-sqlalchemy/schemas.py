@@ -1,0 +1,15 @@
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
+
+
+class PostCreate(BaseModel):
+    title: str
+    content: str
+    published: bool = True
+
+class PostResponse(PostCreate):
+    id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes = True)
