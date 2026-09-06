@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 class BookCreate(BaseModel):
     title: str
     author: str
-    published: bool
+    published: bool = True
 
 class BookResponse(BookCreate):
     id: int
