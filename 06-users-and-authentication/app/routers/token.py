@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import jwt
 from dotenv import load_dotenv
@@ -15,13 +15,14 @@ from ..database import get_db
 oauth_scheme = OAuth2PasswordBearer(tokenUrl = "login")
 load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = os.getenv("ALGORITHM")
-token_expire_time = 30
+ALGORITHM = "HS256"
+token_expire_time = 14
 
 def create_token(data: dict):
-    expire = datetime.now() + timedelta(minutes = token_expire_time)
-    data.update({"exp": expire})
-    access_token = jwt.encode(data, SECRET_KEY, algorithm = ALGORITHM)
+    copy_of_data = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(minutes = token_expire_time)
+    copy_of_data.update({"exp": expire})
+    access_token = jwt.encode(copy_of_data, SECRET_KEY, algorithm = ALGORITHM)
     return access_token
 
 def get_current_user(token: str = Depends(oauth_scheme), 
@@ -33,7 +34,7 @@ def get_current_user(token: str = Depends(oauth_scheme),
     )
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms = ALGORITHM)
+        payload = jwt.decode(token, SECRET_KEY, algorithms = [ALGORITHM])
         user_id = payload.get("user_id")
         if user_id is None:
             raise credentials_exception
