@@ -11,8 +11,8 @@ This repository documents my learning journey through concepts, practice exercis
 - [x] CRUD & API Features
 - [x] PostgreSQL & SQL
 - [x] Database with Python
-- [ ] SQLAlchemy & ORM
-- [ ] Users & Authentication
+- [x] SQLAlchemy & ORM
+- [x] Users & Authentication
 - [ ] Relationships & Advanced Queries
 - [ ] Alembic & API Configuration
 - [ ] Deployment
@@ -71,6 +71,29 @@ This repository documents my learning journey through concepts, practice exercis
 - Learned how to commit database changes
 - Handled missing records with `HTTPException`
 - Connected the FastAPI API to a PostgreSQL database
+
+### Chapter 5 — SQLAlchemy & ORM
+
+- Learned ORM fundamentals
+- Connected FastAPI with PostgreSQL using SQLAlchemy
+- Created database models using SQLAlchemy 2.x
+- Used Pydantic schemas with SQLAlchemy models
+- Practiced database queries using `select()`
+- Implemented CRUD operations using SQLAlchemy ORM
+- Practiced with a separate Books API
+
+### Chapter 6 — Users & Authentication
+
+- Created a users table
+- Implemented user registration
+- Learned password hashing using Argon2
+- Learned password verification
+- Learned JWT authentication basics
+- Learned OAuth2 password flow
+- Learned Bearer token authentication
+- Organized API routes using `APIRouter`
+- Protected routes using dependency injection (`Depends`)
+- Implemented post ownership checks using foreign keys
 
 ## Postman
 
