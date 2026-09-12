@@ -8,10 +8,15 @@ class PostCreate(BaseModel):
     content: str
     published: bool = True
 
+class OwnerPostResponse(BaseModel):
+    id: int
+    email: EmailStr
+
 class PostResponse(PostCreate):
     id: int
     created_at: datetime
     owner_id: int
+    owner: OwnerPostResponse
 
     model_config = ConfigDict(from_attributes = True)
 

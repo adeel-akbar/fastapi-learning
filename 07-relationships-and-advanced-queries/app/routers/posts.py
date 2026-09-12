@@ -12,8 +12,9 @@ router = APIRouter(
 )
 
 @router.get("/", response_model = list[schemas.PostResponse])
-def get_posts(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    result = db.execute(select(models.Post))
+def get_posts(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user),
+        limit: int = 10, skip: int = 0, search: str | None = ""):
+    result = db.execute(select(models.Post).where(models.Post.title.ilike(f"%{search}%")).limit(limit).offset(skip))
     posts = result.scalars().all()
     return posts
 
