@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import IntEnum
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
@@ -30,3 +31,11 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes = True)
+
+class VoteDir(IntEnum):
+    down = 0
+    up = 1
+
+class Vote(BaseModel):
+    post_id: int
+    dir: VoteDir
