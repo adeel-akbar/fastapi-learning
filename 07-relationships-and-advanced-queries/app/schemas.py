@@ -21,6 +21,11 @@ class PostResponse(PostCreate):
 
     model_config = ConfigDict(from_attributes = True)
 
+class PostResponse1(BaseModel):
+    Post: PostResponse
+    votes: int
+
+    model_config = ConfigDict(from_attributes = True)
 class UserCreate(BaseModel):
     email: EmailStr
     password: str

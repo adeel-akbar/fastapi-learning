@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
@@ -11,11 +11,11 @@ router = APIRouter(
     tags = ["posts"]
 )
 
-@router.get("/", response_model = list[schemas.PostResponse])
+@router.get("/", response_model = list[schemas.PostResponse1])
 def get_posts(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user),
         limit: int = 10, skip: int = 0, search: str | None = ""):
-    result = db.execute(select(models.Post).where(models.Post.title.ilike(f"%{search}%")).limit(limit).offset(skip))
-    posts = result.scalars().all()
+    posts = db.execute(select(models.Post, func.count(models.Vote.post_id).label("votes")).join(models.Vote, models.Post.id == 
+        models.Vote.post_id, isouter = True).group_by(models.Post.id).where(models.Post.title.ilike(f"%{search}%")).limit(limit).offset(skip)).all()
     return posts
 
 @router.post("/", response_model = schemas.PostResponse, status_code = status.HTTP_201_CREATED)
@@ -26,9 +26,10 @@ def create_post(post: schemas.PostCreate, db: Session = Depends(get_db), current
     db.refresh(new_post)
     return new_post
 
-@router.get("/{post_id}", response_model = schemas.PostResponse)
+@router.get("/{post_id}", response_model = schemas.PostResponse1)
 def get_post(post_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    post = db.execute(select(models.Post).where(models.Post.id == post_id)).scalar_one_or_none()
+    post = db.execute(select(models.Post, func.count(models.Vote.post_id).label("votes")).join(models.Vote, models.Post.id == models.Vote.post_id, 
+                    isouter = True).group_by(models.Post.id)).all()
     if not post:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, 
                     detail = f"Post with id: {post_id} not present..")
