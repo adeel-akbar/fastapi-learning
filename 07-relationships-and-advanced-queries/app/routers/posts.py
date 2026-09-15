@@ -29,7 +29,7 @@ def create_post(post: schemas.PostCreate, db: Session = Depends(get_db), current
 @router.get("/{post_id}", response_model = schemas.PostResponse1)
 def get_post(post_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     post = db.execute(select(models.Post, func.count(models.Vote.post_id).label("votes")).join(models.Vote, models.Post.id == models.Vote.post_id, 
-                    isouter = True).group_by(models.Post.id)).all()
+                    isouter = True).group_by(models.Post.id).where(models.Post.id == post_id)).first()
     if not post:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, 
                     detail = f"Post with id: {post_id} not present..")
