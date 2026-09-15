@@ -13,7 +13,7 @@ This repository documents my learning journey through concepts, practice exercis
 - [x] Database with Python
 - [x] SQLAlchemy & ORM
 - [x] Users & Authentication
-- [ ] Relationships & Advanced Queries
+- [x] Relationships & Advanced Queries
 - [ ] Alembic & API Configuration
 - [ ] Deployment
 - [ ] Docker
@@ -94,6 +94,17 @@ This repository documents my learning journey through concepts, practice exercis
 - Organized API routes using `APIRouter`
 - Protected routes using dependency injection (`Depends`)
 - Implemented post ownership checks using foreign keys
+
+### Chapter 7 — Relationships & Advanced Queries
+
+- Learned SQL relationships and foreign keys
+- Added user ownership to posts
+- Implemented SQLAlchemy relationships
+- Protected user-owned posts from unauthorized updates and deletes
+- Practiced query parameters and filtering
+- Implemented post search and pagination
+- Added votes/likes functionality
+- Practiced SQL joins with SQLAlchemy
 
 ## Postman
 

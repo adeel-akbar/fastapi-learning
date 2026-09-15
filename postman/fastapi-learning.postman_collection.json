@@ -709,6 +709,264 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Relationships-and-advanced-queries",
+      "item": [
+        {
+          "name": "GET posts",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}posts",
+              "host": [
+                "{{URL}}posts"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set(\"JWT\", pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "username",
+                  "value": "adeel@gmail.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "pass123",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{URL}}login",
+              "host": [
+                "{{URL}}login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create post",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"title\": \"This is my second post\",\r\n    \"content\": \"This is the content of the post\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL}}posts",
+              "host": [
+                "{{URL}}posts"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create user",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"email\": \"saneeza12@gmail.com\",\r\n    \"password\": \"pass12\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL}}users",
+              "host": [
+                "{{URL}}users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET one post",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}posts/9",
+              "host": [
+                "{{URL}}posts"
+              ],
+              "path": [
+                "9"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update post",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"title\": \"Updated title\",\r\n    \"content\": \"Content of the Updated title\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL}}posts/7",
+              "host": [
+                "{{URL}}posts"
+              ],
+              "path": [
+                "7"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete post",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}posts/9",
+              "host": [
+                "{{URL}}posts"
+              ],
+              "path": [
+                "9"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Vote",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"post_id\": 11,\r\n    \"dir\": 1\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL}}vote",
+              "host": [
+                "{{URL}}vote"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [
