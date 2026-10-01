@@ -30,11 +30,24 @@ ls -la
 
 - `-l` → long/detailed format
 - `-a` → include hidden files
+
 `ls` can also be pointed at an absolute path instead of the current directory:
 
 ```bash
 ls /path
 ```
+
+### `ls -l`
+
+Long format without hidden files. Useful for checking permissions.
+
+```bash
+ls -l script.sh
+```
+
+Example output: `-rwxr-xr-x 1 user user 76 Oct 1 15:53 script.sh`
+
+The `x` characters mean the file is executable.
 
 ### `cd`
 
@@ -96,6 +109,12 @@ Removes a file.
 rm file.txt
 ```
 
+`rm` can take several files at once:
+
+```bash
+rm file1.txt file2.txt
+```
+
 ### `rm -r`
 
 Removes a directory and its contents recursively.
@@ -124,6 +143,16 @@ Runs a command with elevated/superuser privileges.
 sudo command
 ```
 
+### `sudo -u`
+
+Runs a single command as a different user.
+
+```bash
+sudo -u postgres psql
+```
+
+This is how you log in to Postgres as admin: the Linux username must match the database role (peer authentication).
+
 ### `groups`
 
 Shows the groups that the current user belongs to.
@@ -131,6 +160,18 @@ Shows the groups that the current user belongs to.
 ```bash
 groups
 ```
+
+### `chmod`
+
+Changes file permissions (who may read, write, or run a file).
+
+```bash
+chmod +x script.sh
+chmod 600 .env
+```
+
+- `+x` → makes a file executable (a script can't be run directly without it)
+- `600` → only the owner can read and write (use this for `.env` files that hold secrets)
 
 ## Packages
 
@@ -147,7 +188,7 @@ sudo apt remove package_name
 
 - `apt update` → updates the package information
 - `apt upgrade` → upgrades installed packages
-- `apt install` → installs a package
+- `apt install` → installs a package (`-y` answers "yes" to the prompt automatically)
 - `apt remove` → removes a package
 
 ## Processes
@@ -168,6 +209,16 @@ Shows detailed information about running processes for all users.
 ps aux
 ```
 
+### `kill -9`
+
+Force-kills a process by its PID. The PID can be found with `systemctl status` (the `Main PID` line) or `ps aux`.
+
+```bash
+sudo kill -9 <PID>
+```
+
+Used to simulate a crash. A service with `Restart=always` is started again by systemd.
+
 ## Services & systemd
 
 ### `systemctl`
@@ -186,14 +237,32 @@ sudo systemctl disable service_name
 - `status` → checks the current status of a service
 - `start` → starts a service
 - `stop` → stops a service
-- `restart` → restarts a service
+- `restart` → restarts a service (needed after editing the env file the service uses)
 - `enable` → enables a service to start automatically at boot
 - `disable` → disables automatic startup at boot
-`enable` can be combined with `--now` to enable a service **and** start it immediately in one command:
+
+`enable` can be combined with `--now` to enable a service **and** start it immediately in one command. `disable --now` does the opposite (disable and stop):
 
 ```bash
 sudo systemctl enable --now service_name
+sudo systemctl disable --now service_name
 ```
+
+Other useful `systemctl` commands:
+
+```bash
+sudo systemctl daemon-reload
+systemctl cat service_name
+```
+
+- `daemon-reload` → makes systemd re-read service files. Run it **every time you create or edit a `.service` file** (not needed when only the env file changes)
+- `cat` → prints a service's unit file
+
+Reading the status output:
+
+- `active (running)` → a long-running program that is alive
+- `active (exited)` → a wrapper that ran once and finished (normal for `postgresql.service`)
+- `Loaded: ... enabled/disabled` → whether it starts on boot
 
 ### `journalctl`
 
@@ -202,9 +271,15 @@ Used to view logs collected by systemd.
 ```bash
 journalctl
 journalctl -u service_name
+journalctl -u service_name -f
+journalctl -u service_name -n 20
 ```
 
-- `-u` → u stands for the unit shows logs for a specific service/unit.
+- `-u` → u stands for the unit; shows logs for a specific service/unit
+- `-f` → follow: new log lines appear live (stop watching with `Ctrl + C`; this does not stop the service)
+- `-n 20` → show only the last 20 lines
+
+This is the first place to look when a service misbehaves.
 
 ## Environment Variables
 
@@ -212,16 +287,73 @@ Environment variables store configuration values outside the application code.
 
 They are commonly used for things such as database URLs, secret keys, and other configuration.
 
-Example:
+Example `.env` file:
 
 ```env
 DATABASE_URL=...
 SECRET_KEY=...
 ```
 
+Setting and loading them in the shell:
+
+```bash
+export NAME=value
+source .env
+set -o allexport; source .env; set +o allexport
+```
+
+- `export NAME=value` → sets a variable for the current shell session
+- `source .env` → loads a file whose lines are written as `export NAME=value`
+- `set -o allexport; source .env; set +o allexport` → loads a plain `NAME=value` file
+
+Things to remember:
+
+- All of the above last only for the current shell session
+- Putting the load command in `~/.profile` loads the variables for your own login shells
+- **systemd services don't read `.profile`.** Use `EnvironmentFile=` in the `.service` file instead (plain `NAME=value` lines, no `export`)
+- A running service keeps the values it started with. After editing the env file, run `sudo systemctl restart service_name`
+- Protect the file: `chmod 600 .env`
+
 ## `.service` Files
 
 A `.service` file is a systemd unit file that tells systemd how to run and manage an application as a service (e.g. what command starts it, when it should restart, what it depends on).
+
+Custom service files go in `/etc/systemd/system/`. The file name becomes the service name (`api.service` → `systemctl status api`).
+
+Template:
+
+```ini
+[Unit]
+Description=Short description of the service
+After=network.target
+
+[Service]
+User=your_user
+WorkingDirectory=/path/to/project
+EnvironmentFile=/path/to/.env
+ExecStart=/full/path/to/program
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+- `[Unit]` → description and start order (`After=network.target` = start after the network is up)
+- `[Service]` → who runs it, where, with which environment variables, which command, and restart behavior
+- `[Install]` → what `systemctl enable` uses to start the service on boot
+- `User=` → run as a normal user, never as root
+- `WorkingDirectory=` → the folder the program starts in
+- `EnvironmentFile=` → file with `NAME=value` lines (a `-` before the path, `EnvironmentFile=-/path`, means "don't fail if the file is missing")
+- `ExecStart=` → needs the **full path** to the program; services don't search `PATH`
+- `Restart=always` → systemd starts it again if it crashes
+
+After creating or editing the file:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl start service_name
+systemctl status service_name
+```
 
 This is what `systemctl` and `journalctl` ultimately interact with.
 
@@ -243,6 +375,7 @@ Useful shortcuts:
 - `Ctrl + W` → search
 - `Ctrl + K` → cut a line
 - `Ctrl + U` → paste a cut line
+
 If you open a file with `nano` and don't make any changes, simply press `Ctrl + X` to exit.
 
 ### `vim`
@@ -294,6 +427,26 @@ cat notes.txt
 
 prints the contents of `notes.txt` to the terminal.
 
+### `tail`
+
+Prints the last lines of a file.
+
+```bash
+tail -n 25 file.txt
+```
+
+- `-n 25` → show the last 25 lines
+
+### `grep` and the pipe `|`
+
+The pipe `|` sends the output of one command into the next command. `grep` keeps only the lines that contain a word.
+
+```bash
+ls ~ | grep test
+```
+
+This lists your home folder and shows only the entries containing "test" (prints nothing if there are none).
+
 ## Quick Reference
 
 | Command | Purpose |
@@ -301,6 +454,7 @@ prints the contents of `notes.txt` to the terminal.
 | `pwd` | Show current directory |
 | `ls` | List files and directories |
 | `ls -la` | List all files with detailed information |
+| `ls -l` | List files with permissions |
 | `ls /path` | List contents of a specific (absolute) path |
 | `cd` | Change directory |
 | `cd ..` | Go to parent directory |
@@ -309,19 +463,30 @@ prints the contents of `notes.txt` to the terminal.
 | `mkdir` | Create a directory |
 | `touch` | Create an empty file |
 | `exit` | Exit the current shell session |
-| `rm` | Remove a file |
+| `rm` | Remove a file (or several) |
 | `rm -r` | Remove a directory and its contents |
 | `whoami` | Show current user |
 | `sudo` | Run command with elevated privileges |
+| `sudo -u <user>` | Run a command as another user |
 | `groups` | Show user's groups |
+| `chmod +x` | Make a file executable |
+| `chmod 600` | Owner-only read/write (for `.env` files) |
 | `apt` | Manage Ubuntu packages |
 | `ps` | Show running processes |
 | `ps aux` | Show detailed running processes |
+| `kill -9 <PID>` | Force-kill a process |
 | `systemctl` | Manage systemd services |
 | `systemctl enable --now` | Enable a service and start it immediately |
+| `systemctl disable --now` | Disable a service and stop it immediately |
+| `systemctl daemon-reload` | Re-read service files after creating/editing one |
+| `systemctl cat` | Show a service's unit file |
 | `journalctl` | View systemd logs |
 | `journalctl -u <service>` | View logs for a specific service/unit |
+| `journalctl -u <service> -f` | Follow a service's logs live |
+| `journalctl -u <service> -n 20` | Show the last 20 log lines of a service |
 | `nano` | Simple terminal text editor |
 | `vim` | Advanced terminal text editor |
 | `vi` | Original Unix text editor |
 | `cat` | Display file contents |
+| `tail -n N` | Show the last N lines of a file |
+| `grep` and `\|` | Filter a command's output with a pipe |
