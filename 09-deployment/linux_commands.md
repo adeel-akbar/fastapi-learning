@@ -39,7 +39,7 @@ ls /path
 
 ### `ls -l`
 
-Long format without hidden files. Useful for checking permissions.
+Long format without hidden files. Useful for checking permissions and for spotting symbolic links (`->`).
 
 ```bash
 ls -l script.sh
@@ -115,6 +115,8 @@ rm file.txt
 rm file1.txt file2.txt
 ```
 
+Running `rm` on a symbolic link removes only the link, not the file it points to.
+
 ### `rm -r`
 
 Removes a directory and its contents recursively.
@@ -124,6 +126,16 @@ rm -r folder_name
 ```
 
 > ⚠️ Be careful with `rm` because deleted files are generally not moved to a recycle bin.
+
+### `ln -s`
+
+Creates a symbolic link (a shortcut that points to another file).
+
+```bash
+sudo ln -s /real/file /where/the/shortcut/goes
+```
+
+The first path is the real file and the second is the shortcut. Editing the real file changes what the shortcut shows. Nginx uses this to enable sites (see the Nginx section).
 
 ## Users & Permissions
 
@@ -191,6 +203,90 @@ sudo apt remove package_name
 - `apt install` → installs a package (`-y` answers "yes" to the prompt automatically)
 - `apt remove` → removes a package
 
+## Python Environment
+
+### Virtual environment
+
+An isolated copy of Python for one project. Packages installed while it is active go only into it.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+deactivate
+```
+
+- `python3 -m venv .venv` → creates the environment in a hidden folder called `.venv` (if it fails, run `sudo apt install -y python3-venv`)
+- `source .venv/bin/activate` → activates it; the prompt starts with `(.venv)`
+- `deactivate` → leaves the environment
+
+### `which`
+
+Shows the full path of the program the shell would run.
+
+```bash
+which python
+```
+
+With the venv active, the path should end in `.venv/bin/python`.
+
+### `pip install`
+
+Installs Python packages (into the active venv).
+
+```bash
+pip install fastapi uvicorn gunicorn uvicorn-worker
+pip install -r requirements.txt
+```
+
+- `uvicorn-worker` → lets Gunicorn use Uvicorn as its worker type (newer Uvicorn versions moved it out of Uvicorn itself)
+- `-r requirements.txt` → installs everything listed in the file
+
+## Running the App
+
+### `uvicorn`
+
+Runs a FastAPI app as a single process (no `--reload` in production).
+
+```bash
+uvicorn main:app
+```
+
+`main:app` means "the `app` object inside `main.py`".
+
+### `gunicorn`
+
+A process manager that runs several Uvicorn workers.
+
+```bash
+gunicorn -w 4 -k uvicorn_worker.UvicornWorker main:app --bind 127.0.0.1:8000
+```
+
+- `-w 4` → number of worker processes
+- `-k uvicorn_worker.UvicornWorker` → worker type
+- `main:app` → the app object, same format as Uvicorn
+- `--bind 127.0.0.1:8000` → listen on this machine only (right choice behind Nginx)
+
+How it behaves:
+
+- One **master** process manages the **workers**; only workers handle requests
+- If a worker dies, the master starts a replacement
+- If the master dies, systemd (`Restart=always`) replaces the whole group
+- Stop it gracefully with `Ctrl + C`; `kill -9` destroys a process immediately
+
+## Networking
+
+### `curl`
+
+Sends an HTTP request from the terminal and prints the response (it plays the role of the browser).
+
+```bash
+curl http://127.0.0.1:8000
+curl http://127.0.0.1
+```
+
+- With no port in the address, `http://` means port 80 (and `https://` means port 443)
+- A **502 Bad Gateway** from Nginx means Nginx is fine but the app behind it isn't answering
+
 ## Processes
 
 ### `ps`
@@ -208,6 +304,14 @@ Shows detailed information about running processes for all users.
 ```bash
 ps aux
 ```
+
+To look for one program, pipe it into `grep`:
+
+```bash
+ps aux | grep gunicorn
+```
+
+The last line is the `grep` command itself and can be ignored.
 
 ### `kill -9`
 
@@ -253,16 +357,20 @@ Other useful `systemctl` commands:
 ```bash
 sudo systemctl daemon-reload
 systemctl cat service_name
+sudo systemctl reload service_name
 ```
 
 - `daemon-reload` → makes systemd re-read service files. Run it **every time you create or edit a `.service` file** (not needed when only the env file changes)
 - `cat` → prints a service's unit file
+- `reload` → applies new config without stopping the service (used for Nginx)
 
 Reading the status output:
 
 - `active (running)` → a long-running program that is alive
 - `active (exited)` → a wrapper that ran once and finished (normal for `postgresql.service`)
 - `Loaded: ... enabled/disabled` → whether it starts on boot
+
+If a service isn't running after a reboot, check whether it is `enabled`.
 
 ### `journalctl`
 
@@ -347,6 +455,12 @@ WantedBy=multi-user.target
 - `ExecStart=` → needs the **full path** to the program; services don't search `PATH`
 - `Restart=always` → systemd starts it again if it crashes
 
+For a Gunicorn app, `ExecStart` uses the full path to the venv's own `gunicorn`, because a service doesn't activate the venv:
+
+```ini
+ExecStart=/home/user/project/.venv/bin/gunicorn -w 4 -k uvicorn_worker.UvicornWorker main:app --bind 127.0.0.1:8000
+```
+
 After creating or editing the file:
 
 ```bash
@@ -356,6 +470,77 @@ systemctl status service_name
 ```
 
 This is what `systemctl` and `journalctl` ultimately interact with.
+
+## Nginx
+
+Nginx listens on the public ports (80 and 443) and forwards requests to the app on `127.0.0.1:8000` (a reverse proxy).
+
+```bash
+sudo apt install -y nginx
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+- Installing it also starts it and enables it on boot
+- `nginx -t` → tests the config for mistakes before applying it (look for `syntax is ok`)
+- `systemctl reload nginx` → applies the new config without stopping Nginx
+
+Config files:
+
+- Real files live in `/etc/nginx/sites-available/`
+- Nginx only reads `/etc/nginx/sites-enabled/`, which holds **shortcuts** to the files in `sites-available/`
+- Enable a site: `sudo ln -s /etc/nginx/sites-available/api /etc/nginx/sites-enabled/api`
+- Disable a site: remove its shortcut with `sudo rm /etc/nginx/sites-enabled/<name>` (the real file stays safe)
+- The default welcome-page site should be disabled so it doesn't answer instead of your app
+- The tutor's simpler way also works: edit the `default` file and replace its `location` block
+
+Minimal site config:
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name _;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+- `proxy_pass` is the line that forwards requests to the app
+- The `proxy_set_header` lines pass along the original domain, the visitor's real IP, and HTTP vs HTTPS
+- `server_name _;` matches any name; later put the real domain here
+
+### `grep -v`
+
+Shows only the lines that do **not** contain the given text. Handy for reading a config without its comments:
+
+```bash
+grep -v '#' /etc/nginx/sites-available/default
+```
+
+## Firewall (UFW)
+
+A firewall decides which ports the outside world may reach. Block everything by default and allow only what is needed. (To be done on the real server; don't enable it in WSL.)
+
+```bash
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+sudo ufw status
+sudo ufw delete allow 80/tcp
+```
+
+- `22` → SSH, `80` → HTTP, `443` → HTTPS
+- Allow SSH (22) **before** running `enable`, or you can lock yourself out of the server
+- Don't allow 8000 or 5432: only Nginx (and the app itself) need them, and they talk over `localhost`
+- On Oracle Cloud, ports must also be opened in the Oracle console (security list), and the Ubuntu image has its own restrictive rules
 
 ## Text Editors & File Viewing
 
@@ -454,7 +639,7 @@ This lists your home folder and shows only the entries containing "test" (prints
 | `pwd` | Show current directory |
 | `ls` | List files and directories |
 | `ls -la` | List all files with detailed information |
-| `ls -l` | List files with permissions |
+| `ls -l` | List files with permissions (and show symlinks) |
 | `ls /path` | List contents of a specific (absolute) path |
 | `cd` | Change directory |
 | `cd ..` | Go to parent directory |
@@ -465,6 +650,7 @@ This lists your home folder and shows only the entries containing "test" (prints
 | `exit` | Exit the current shell session |
 | `rm` | Remove a file (or several) |
 | `rm -r` | Remove a directory and its contents |
+| `ln -s` | Create a symbolic link (shortcut) |
 | `whoami` | Show current user |
 | `sudo` | Run command with elevated privileges |
 | `sudo -u <user>` | Run a command as another user |
@@ -472,6 +658,14 @@ This lists your home folder and shows only the entries containing "test" (prints
 | `chmod +x` | Make a file executable |
 | `chmod 600` | Owner-only read/write (for `.env` files) |
 | `apt` | Manage Ubuntu packages |
+| `python3 -m venv .venv` | Create a virtual environment |
+| `source .venv/bin/activate` | Activate the virtual environment |
+| `deactivate` | Leave the virtual environment |
+| `which` | Show the full path of a program |
+| `pip install` | Install Python packages |
+| `uvicorn main:app` | Run the app as a single process |
+| `gunicorn -w 4 -k ...` | Run the app with several Uvicorn workers |
+| `curl <url>` | Send an HTTP request from the terminal |
 | `ps` | Show running processes |
 | `ps aux` | Show detailed running processes |
 | `kill -9 <PID>` | Force-kill a process |
@@ -480,13 +674,18 @@ This lists your home folder and shows only the entries containing "test" (prints
 | `systemctl disable --now` | Disable a service and stop it immediately |
 | `systemctl daemon-reload` | Re-read service files after creating/editing one |
 | `systemctl cat` | Show a service's unit file |
+| `systemctl reload nginx` | Apply new Nginx config without stopping it |
 | `journalctl` | View systemd logs |
 | `journalctl -u <service>` | View logs for a specific service/unit |
 | `journalctl -u <service> -f` | Follow a service's logs live |
 | `journalctl -u <service> -n 20` | Show the last 20 log lines of a service |
+| `nginx -t` | Test the Nginx config for mistakes |
+| `ufw allow <port>/tcp` | Allow a port through the firewall |
+| `ufw enable` / `ufw status` | Turn the firewall on / show its rules |
 | `nano` | Simple terminal text editor |
 | `vim` | Advanced terminal text editor |
 | `vi` | Original Unix text editor |
 | `cat` | Display file contents |
 | `tail -n N` | Show the last N lines of a file |
 | `grep` and `\|` | Filter a command's output with a pipe |
+| `grep -v` | Show only lines that do not contain the text |
