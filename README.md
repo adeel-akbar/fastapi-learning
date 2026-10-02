@@ -15,7 +15,7 @@ This repository documents my learning journey through concepts, practice exercis
 - [x] Users & Authentication
 - [x] Relationships & Advanced Queries
 - [x] Alembic & API Configuration
-- [ ] Deployment
+- [x] Deployment
 - [ ] Docker
 - [ ] Testing
 - [ ] CI/CD
@@ -114,6 +114,21 @@ This repository documents my learning journey through concepts, practice exercis
 - Applied migrations to the database using `upgrade`/`downgrade`
 - Disabled `Base.metadata.create_all` in favor of Alembic-managed schema
 - Learned what CORS is and enabled CORS middleware in the FastAPI app
+
+### Chapter 9 — Deployment
+
+- Deployed the FastAPI API using Render with Neon PostgreSQL
+- Learned Linux/Ubuntu fundamentals for manual server deployment
+- Created and configured an Oracle Cloud Ubuntu VM
+- Connected to the remote server using SSH
+- Set up PostgreSQL and production environment variables on the server
+- Ran database migrations with Alembic
+- Served the FastAPI application using Gunicorn with Uvicorn workers
+- Managed the application as a background service using systemd
+- Configured Nginx as a reverse proxy
+- Configured UFW and Oracle Cloud network/firewall rules
+- Learned domain, DNS, SSL/TLS, and Certbot concepts
+- Verified the deployment survives a server reboot
 
 ## Postman
 
