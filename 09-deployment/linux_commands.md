@@ -30,7 +30,6 @@ ls -la
 
 - `-l` → long/detailed format
 - `-a` → include hidden files
-
 `ls` can also be pointed at an absolute path instead of the current directory:
 
 ```bash
@@ -46,7 +45,6 @@ ls -l script.sh
 ```
 
 Example output: `-rwxr-xr-x 1 user user 76 Oct 1 15:53 script.sh`
-
 The `x` characters mean the file is executable.
 
 ### `cd`
@@ -126,7 +124,7 @@ rm -r folder_name
 ```
 
 > ⚠️ Be careful with `rm` because deleted files are generally not moved to a recycle bin.
-
+>
 ### `ln -s`
 
 Creates a symbolic link (a shortcut that points to another file).
@@ -265,13 +263,23 @@ gunicorn -w 4 -k uvicorn_worker.UvicornWorker main:app --bind 127.0.0.1:8000
 - `-k uvicorn_worker.UvicornWorker` → worker type
 - `main:app` → the app object, same format as Uvicorn
 - `--bind 127.0.0.1:8000` → listen on this machine only (right choice behind Nginx)
-
 How it behaves:
-
 - One **master** process manages the **workers**; only workers handle requests
 - If a worker dies, the master starts a replacement
 - If the master dies, systemd (`Restart=always`) replaces the whole group
 - Stop it gracefully with `Ctrl + C`; `kill -9` destroys a process immediately
+
+## SSH / Remote Server Access
+
+ssh -i
+Connects securely to a remote Linux server using an SSH private key.
+`-i <private-key-file> ubuntu@<server-public-ip>`
+
+- -i → specifies the private key file used for authentication
+- ubuntu → the normal login user on the Oracle Ubuntu image
+- `<server-public-ip>` → the public IPv4 address of the VM
+- The first connection may ask you to confirm the server fingerprint
+- exit closes the SSH session
 
 ## Networking
 
@@ -286,6 +294,13 @@ curl http://127.0.0.1
 
 - With no port in the address, `http://` means port 80 (and `https://` means port 443)
 - A **502 Bad Gateway** from Nginx means Nginx is fine but the app behind it isn't answering
+ss
+Shows listening network sockets/ports. Useful for checking which program owns a port.
+sudo ss -tulpn
+sudo ss -tulpn | grep :80
+Useful during the real deployment to confirm that:
+- Nginx was listening publicly on 0.0.0.0:80
+- Gunicorn was listening only locally on 127.0.0.1:8000
 
 ## Processes
 
@@ -344,7 +359,6 @@ sudo systemctl disable service_name
 - `restart` → restarts a service (needed after editing the env file the service uses)
 - `enable` → enables a service to start automatically at boot
 - `disable` → disables automatic startup at boot
-
 `enable` can be combined with `--now` to enable a service **and** start it immediately in one command. `disable --now` does the opposite (disable and stop):
 
 ```bash
@@ -363,13 +377,10 @@ sudo systemctl reload service_name
 - `daemon-reload` → makes systemd re-read service files. Run it **every time you create or edit a `.service` file** (not needed when only the env file changes)
 - `cat` → prints a service's unit file
 - `reload` → applies new config without stopping the service (used for Nginx)
-
 Reading the status output:
-
 - `active (running)` → a long-running program that is alive
 - `active (exited)` → a wrapper that ran once and finished (normal for `postgresql.service`)
 - `Loaded: ... enabled/disabled` → whether it starts on boot
-
 If a service isn't running after a reboot, check whether it is `enabled`.
 
 ### `journalctl`
@@ -386,15 +397,12 @@ journalctl -u service_name -n 20
 - `-u` → u stands for the unit; shows logs for a specific service/unit
 - `-f` → follow: new log lines appear live (stop watching with `Ctrl + C`; this does not stop the service)
 - `-n 20` → show only the last 20 lines
-
 This is the first place to look when a service misbehaves.
 
 ## Environment Variables
 
 Environment variables store configuration values outside the application code.
-
 They are commonly used for things such as database URLs, secret keys, and other configuration.
-
 Example `.env` file:
 
 ```env
@@ -413,9 +421,7 @@ set -o allexport; source .env; set +o allexport
 - `export NAME=value` → sets a variable for the current shell session
 - `source .env` → loads a file whose lines are written as `export NAME=value`
 - `set -o allexport; source .env; set +o allexport` → loads a plain `NAME=value` file
-
 Things to remember:
-
 - All of the above last only for the current shell session
 - Putting the load command in `~/.profile` loads the variables for your own login shells
 - **systemd services don't read `.profile`.** Use `EnvironmentFile=` in the `.service` file instead (plain `NAME=value` lines, no `export`)
@@ -425,23 +431,19 @@ Things to remember:
 ## `.service` Files
 
 A `.service` file is a systemd unit file that tells systemd how to run and manage an application as a service (e.g. what command starts it, when it should restart, what it depends on).
-
 Custom service files go in `/etc/systemd/system/`. The file name becomes the service name (`api.service` → `systemctl status api`).
-
 Template:
 
 ```ini
 [Unit]
 Description=Short description of the service
 After=network.target
-
 [Service]
 User=your_user
 WorkingDirectory=/path/to/project
 EnvironmentFile=/path/to/.env
 ExecStart=/full/path/to/program
 Restart=always
-
 [Install]
 WantedBy=multi-user.target
 ```
@@ -454,7 +456,6 @@ WantedBy=multi-user.target
 - `EnvironmentFile=` → file with `NAME=value` lines (a `-` before the path, `EnvironmentFile=-/path`, means "don't fail if the file is missing")
 - `ExecStart=` → needs the **full path** to the program; services don't search `PATH`
 - `Restart=always` → systemd starts it again if it crashes
-
 For a Gunicorn app, `ExecStart` uses the full path to the venv's own `gunicorn`, because a service doesn't activate the venv:
 
 ```ini
@@ -484,31 +485,27 @@ sudo systemctl reload nginx
 - Installing it also starts it and enables it on boot
 - `nginx -t` → tests the config for mistakes before applying it (look for `syntax is ok`)
 - `systemctl reload nginx` → applies the new config without stopping Nginx
-
 Config files:
-
 - Real files live in `/etc/nginx/sites-available/`
 - Nginx only reads `/etc/nginx/sites-enabled/`, which holds **shortcuts** to the files in `sites-available/`
 - Enable a site: `sudo ln -s /etc/nginx/sites-available/api /etc/nginx/sites-enabled/api`
 - Disable a site: remove its shortcut with `sudo rm /etc/nginx/sites-enabled/<name>` (the real file stays safe)
 - The default welcome-page site should be disabled so it doesn't answer instead of your app
 - The tutor's simpler way also works: edit the `default` file and replace its `location` block
-
 Minimal site config:
 
 ```nginx
 server {
-    listen 80;
-    listen [::]:80;
-    server_name _;
-
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+    listen 80;
+    listen [::]:80;
+    server_name _;
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 }
 ```
 
@@ -534,6 +531,7 @@ sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw enable
 sudo ufw status
+sudo ufw show added
 sudo ufw delete allow 80/tcp
 ```
 
@@ -541,6 +539,57 @@ sudo ufw delete allow 80/tcp
 - Allow SSH (22) **before** running `enable`, or you can lock yourself out of the server
 - Don't allow 8000 or 5432: only Nginx (and the app itself) need them, and they talk over `localhost`
 - On Oracle Cloud, ports must also be opened in the Oracle console (security list), and the Ubuntu image has its own restrictive rules
+
+## Real Oracle Server Commands
+
+These were used during the real Oracle Cloud deployment. The Oracle-specific firewall commands are reference material; they do not need to be memorized.
+
+### SSH
+
+Connect from Windows CMD with the downloaded private key:
+ssh -i ssh-key-2026-10-02.key ubuntu@<PUBLIC_IP>
+
+### Check listening ports
+
+sudo ss -tulpn
+sudo ss -tulpn | grep :80
+Useful for checking which program is listening on a port. In this deployment, Nginx listens publicly on port 80 while Gunicorn listens only on 127.0.0.1:8000.
+
+### Check whether a service starts on boot
+
+sudo systemctl is-enabled fastapi
+sudo systemctl is-enabled nginx
+enabled means systemd will start the service automatically when the server boots.
+
+### Reboot the server
+
+sudo reboot
+The SSH connection closes during reboot. Reconnect afterward and check the services without starting them manually.
+
+### Oracle image firewall / iptables
+
+On the Oracle Ubuntu image, an existing iptables REJECT rule appeared before UFW's rules. That meant Oracle's Security List and UFW could both allow HTTP while the VM still rejected it.
+Inspect the INPUT chain:
+sudo iptables -L INPUT -n --line-numbers
+For this server, HTTP and HTTPS were inserted before the existing REJECT rule:
+sudo iptables -I INPUT 5 -p tcp --dport 80 -j ACCEPT
+sudo iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT
+Then the rules were made persistent across reboots:
+sudo apt install iptables-persistent
+Remember the concept rather than the exact rule numbers: cloud firewall + OS firewall + lower-level firewall rules can all affect public access. Do not open Gunicorn port 8000 or PostgreSQL port 5432 publicly.
+
+### Oracle iptables troubleshooting (reference only)
+
+On the Oracle Ubuntu VM, public HTTP still timed out even after port 80 was allowed in both the Oracle Security List and UFW.
+The rules were inspected with:
+sudo iptables -L INPUT -n --line-numbers
+This showed an existing REJECT rule before the UFW chains. Because firewall rules are processed in order, traffic was rejected before it could reach UFW's allow rules.
+For this server, HTTP and HTTPS accept rules were inserted before that reject rule:
+sudo iptables -I INPUT 5 -p tcp --dport 80 -j ACCEPT
+sudo iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT
+Then the rules were made persistent across reboots:
+sudo apt install iptables-persistent
+The important concept is firewall rule order and multiple firewall layers. The exact iptables syntax/line numbers are troubleshooting reference material and do not need to be memorized.
 
 ## Text Editors & File Viewing
 
@@ -560,7 +609,6 @@ Useful shortcuts:
 - `Ctrl + W` → search
 - `Ctrl + K` → cut a line
 - `Ctrl + U` → paste a cut line
-
 If you open a file with `nano` and don't make any changes, simply press `Ctrl + X` to exit.
 
 ### `vim`
@@ -580,20 +628,16 @@ Vim has different modes and uses commands such as:
 ### `vi`
 
 `vi` is the older/original Unix text editor. Vim (Vi IMproved) was developed as an improved version of `vi`.
-
 Conceptually:
 
 ```text
-vi  → original editor
+vi  → original editor
 vim → improved version of vi
 ```
 
 They share many of the same basic concepts and commands.
-
 **Which editor will we commonly use?**
-
 During this deployment/Linux journey, we'll commonly use `nano` because it is simpler and more beginner-friendly. It doesn't require learning Vim's different modes just to make a small configuration change.
-
 Vim is still useful to know because we will encounter it on Linux servers and in many tutorials.
 
 ### `cat`
