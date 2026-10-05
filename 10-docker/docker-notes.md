@@ -1555,3 +1555,960 @@ docker-compose.yml
 as the development configuration and will create a separate production configuration.
 
 ---
+
+## Production Docker Compose
+
+Our development Compose configuration builds the FastAPI image directly from our local project:
+
+```yaml
+api:
+  build: .
+```
+
+This is useful during development because the source code and Dockerfile are available locally.
+
+For production, we can instead use an application image that has already been built and stored in a container registry such as Docker Hub.
+
+Our production Compose file is:
+
+```text
+docker-compose.prod.yml
+```
+
+For our project:
+
+```yaml
+services:
+  api:
+    image: adeelakbar/fastapi-social-api:latest
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18
+    env_file:
+      - .env.docker
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+```
+
+For now, `.env.docker` is being used while testing the production-like configuration locally.
+
+Actual production secrets should be provided securely by the production environment and should not be committed to Git or baked into the Docker image.
+
+---
+
+## `build:` vs `image:`
+
+The important difference between our development and production API services is:
+
+### Development
+
+```yaml
+api:
+  build: .
+```
+
+This means:
+
+```text
+Local Project
+     ↓
+Dockerfile
+     ↓
+Docker builds image locally
+     ↓
+Container
+```
+
+### Production
+
+```yaml
+api:
+  image: adeelakbar/fastapi-social-api:latest
+```
+
+This means:
+
+```text
+Docker Registry
+     ↓
+Prebuilt application image
+     ↓
+Production environment
+     ↓
+Container
+```
+
+A prebuilt image is not a different type of Docker image.
+
+It simply means the image was built before being used by the production environment.
+
+Conceptually:
+
+```text
+Source Code
+     ↓
+Dockerfile
+     ↓
+docker build
+     ↓
+Docker Image
+     ↓
+Docker Hub
+     ↓
+Production
+     ↓
+Container
+```
+
+This allows a production machine to run the packaged application without having to build the image from the source code itself.
+
+---
+
+## Why Production Does Not Use a Bind Mount
+
+Our development Compose file contains:
+
+```yaml
+volumes:
+  - ./:/usr/src/app
+```
+
+This allows local source-code changes to immediately appear inside the development container.
+
+Production does not need this because the application code is already included in the Docker image through:
+
+```dockerfile
+COPY . .
+```
+
+Therefore:
+
+```text
+Development
+
+Local Code
+    ↕
+Bind Mount
+    ↕
+Container
+```
+
+while production uses:
+
+```text
+Production
+
+Docker Image
+     ↓
+Code already inside image
+     ↓
+Container
+```
+
+This makes the production container independent of a local source-code directory.
+
+---
+
+## Why Production Does Not Use `--reload`
+
+Our development Compose file overrides the Dockerfile command with:
+
+```yaml
+command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+`--reload` watches the source files and restarts Uvicorn when code changes.
+
+This is useful during development.
+
+Production code should not be changing continuously, so production does not use `--reload`.
+
+Instead, the production container can use the default command already defined in the Dockerfile:
+
+```dockerfile
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+Therefore:
+
+```text
+Development
+→ Bind mount
+→ --reload
+
+Production
+→ Code inside image
+→ No bind mount
+→ No --reload
+```
+
+---
+
+## Docker Image Tags
+
+A Docker image can have a name and a tag.
+
+For example:
+
+```text
+adeelakbar/fastapi-social-api:latest
+```
+
+Breakdown:
+
+```text
+adeelakbar
+     ↓
+Docker Hub username
+
+fastapi-social-api
+     ↓
+Repository/image name
+
+latest
+     ↓
+Image tag
+```
+
+The general format is:
+
+```text
+USERNAME/REPOSITORY:TAG
+```
+
+Tags can be used to identify different versions of an image.
+
+For example:
+
+```text
+adeelakbar/fastapi-social-api:latest
+adeelakbar/fastapi-social-api:v1
+adeelakbar/fastapi-social-api:v2
+```
+
+---
+
+## Tagging an Existing Docker Image
+
+Docker Compose had already built our FastAPI image locally:
+
+```text
+social-media-api-api:latest
+```
+
+Instead of rebuilding the same application, we gave the existing image another tag:
+
+```bash
+docker tag social-media-api-api:latest adeelakbar/fastapi-social-api:latest
+```
+
+Conceptually:
+
+```text
+                  Same Docker Image
+                         |
+              -----------------------
+              |                     |
+social-media-api-api:latest    adeelakbar/fastapi-social-api:latest
+Local Compose name             Docker Hub compatible name
+```
+
+Tagging does not rebuild the image.
+
+It gives an existing image another name/tag.
+
+---
+
+## Pushing Our Image to Docker Hub
+
+Docker Hub is a container registry where Docker images can be stored and distributed.
+
+Our repository is:
+
+```text
+adeelakbar/fastapi-social-api
+```
+
+The overall flow is:
+
+```text
+Application Code
+      ↓
+Dockerfile
+      ↓
+Docker Image
+      ↓
+Tag Image
+      ↓
+Docker Hub
+      ↓
+Other Machine / Production Server
+      ↓
+Pull Image
+      ↓
+Run Container
+```
+
+This is different from GitHub:
+
+```text
+GitHub
+→ stores source code
+
+Docker Hub
+→ stores Docker images
+```
+
+---
+
+## Docker Login
+
+To authenticate the Docker CLI with Docker Hub:
+
+```bash
+docker login
+```
+
+Docker guides us through authentication.
+
+A username can also be specified:
+
+```bash
+docker login -u adeelakbar
+```
+
+To remove the stored authentication:
+
+```bash
+docker logout
+```
+
+If Docker Desktop is already authenticated, the Docker CLI may already have the credentials needed to push images, so a separate login may not always be required.
+
+Passwords or access credentials should not be placed directly into commands or committed to source control.
+
+---
+
+## Pushing an Image to Docker Hub
+
+After tagging the image correctly:
+
+```bash
+docker push adeelakbar/fastapi-social-api:latest
+```
+
+Conceptually:
+
+```text
+Local Image
+adeelakbar/fastapi-social-api:latest
+          ↓
+      docker push
+          ↓
+      Docker Hub
+          ↓
+adeelakbar/fastapi-social-api:latest
+```
+
+Once the image exists in Docker Hub, another machine can obtain and run that packaged application.
+
+---
+
+## Pulling a Docker Image
+
+An image can be downloaded from a registry using:
+
+```bash
+docker pull adeelakbar/fastapi-social-api:latest
+```
+
+Conceptually:
+
+```text
+Docker Hub
+     ↓
+docker pull
+     ↓
+Local Docker Engine
+     ↓
+Docker Image
+```
+
+When Compose needs an image that is not available locally, Docker can obtain the required image from the configured registry.
+
+---
+
+## Running a Specific Compose File
+
+Normally:
+
+```bash
+docker compose up
+```
+
+uses the default Compose configuration.
+
+Because our production configuration has a different filename:
+
+```text
+docker-compose.prod.yml
+```
+
+we specify it using `-f`:
+
+```bash
+docker compose -f docker-compose.prod.yml up
+```
+
+`-f` means:
+
+```text
+Use this specific Compose file
+```
+
+The same applies to other Compose commands.
+
+For example:
+
+```bash
+docker compose -f docker-compose.prod.yml down
+```
+
+or:
+
+```bash
+docker compose -f docker-compose.prod.yml ps
+```
+
+or:
+
+```bash
+docker compose -f docker-compose.prod.yml logs
+```
+
+---
+
+## Testing the Production Compose Configuration Locally
+
+Before eventually using a production configuration on a server, we can test it locally.
+
+First stop the development environment:
+
+```bash
+docker compose down
+```
+
+Then start the production Compose configuration:
+
+```bash
+docker compose -f docker-compose.prod.yml up
+```
+
+Our production-like test confirmed:
+
+```text
+PostgreSQL Container
+      ↓
+Healthy
+      ↓
+FastAPI Container
+      ↓
+Uvicorn
+      ↓
+Application Running
+```
+
+Unlike the development configuration, the production logs did not contain a Uvicorn reloader because `--reload` was not being used.
+
+---
+
+## Docker and Alembic in a Fresh Environment
+
+The Docker image contains our application and Alembic migrations, but creating a fresh PostgreSQL database does not automatically apply those migrations.
+
+For a fresh database, migrations still need to be applied.
+
+With the normal development Compose file:
+
+```bash
+docker compose exec api alembic upgrade head
+```
+
+With our production Compose file:
+
+```bash
+docker compose -f docker-compose.prod.yml exec api alembic upgrade head
+```
+
+If an existing PostgreSQL named volume is reused, the tables created previously remain in that volume.
+
+Therefore:
+
+```text
+docker compose down
+      ↓
+Containers removed
+      ↓
+Named volume remains
+      ↓
+Database schema/data remains
+```
+
+This is why migrations do not need to be reapplied simply because a container was recreated when the same database volume is being reused.
+
+---
+
+## Docker Image Layers
+
+Docker images are built in layers based on Dockerfile instructions.
+
+Our Dockerfile:
+
+```dockerfile
+FROM python:3.14.7
+
+WORKDIR /usr/src/app
+
+COPY requirements.txt ./
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+can be thought of conceptually as:
+
+```text
+FROM python:3.14.7
+        ↓
+Base layer
+
+WORKDIR /usr/src/app
+        ↓
+Working-directory layer
+
+COPY requirements.txt ./
+        ↓
+Requirements layer
+
+RUN pip install ...
+        ↓
+Dependencies layer
+
+COPY . .
+        ↓
+Application-code layer
+```
+
+Docker can reuse unchanged layers from its build cache.
+
+---
+
+## Why `requirements.txt` Is Copied First
+
+The order of Dockerfile instructions matters for build caching.
+
+We intentionally use:
+
+```dockerfile
+COPY requirements.txt ./
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+```
+
+Application code changes frequently, while dependencies usually change less frequently.
+
+If we modify only a Python source file:
+
+```text
+Python base              → unchanged → cached
+Working directory        → unchanged → cached
+requirements.txt         → unchanged → cached
+Installed dependencies   → unchanged → cached
+Application code         → changed   → rebuilt
+```
+
+Docker can reuse the dependency layers instead of reinstalling every Python package.
+
+If `requirements.txt` changes:
+
+```text
+requirements.txt changes
+        ↓
+Requirements layer changes
+        ↓
+pip install runs again
+        ↓
+New dependency layer
+```
+
+This is exactly what we want.
+
+---
+
+## Why We Do Not Copy the Entire Project First
+
+Consider:
+
+```dockerfile
+COPY . .
+
+RUN pip install --no-cache-dir -r requirements.txt
+```
+
+If one application source file changes, the `COPY . .` layer changes.
+
+Instructions after that layer may then need to be rebuilt as well.
+
+That could cause dependencies to be installed again even though `requirements.txt` itself did not change.
+
+Therefore:
+
+```text
+Less frequently changing files
+          ↓
+requirements.txt
+          ↓
+Install dependencies
+          ↓
+Frequently changing files
+          ↓
+Application source code
+```
+
+is a more efficient Dockerfile structure.
+
+---
+
+## Pip Cache vs Docker Build Cache
+
+These are two different caches.
+
+Our command:
+
+```bash
+pip install --no-cache-dir -r requirements.txt
+```
+
+uses:
+
+```text
+--no-cache-dir
+```
+
+to tell **pip** not to keep downloaded package files after installation.
+
+Docker's build cache is separate.
+
+```text
+Pip cache
+→ downloaded Python package files
+
+Docker build cache
+→ previously built Docker layers
+```
+
+Therefore using:
+
+```text
+--no-cache-dir
+```
+
+does not disable Docker's layer caching.
+
+---
+
+## Docker Development and Production Flow
+
+The complete workflow we practiced is:
+
+```text
+                    DEVELOPMENT
+
+Source Code
+     ↓
+Dockerfile
+     ↓
+docker-compose.yml
+     ↓
+build: .
+     ↓
+FastAPI Image
+     ↓
+FastAPI Container ← Bind Mount ← Local Code
+     ↓
+Uvicorn --reload
+
+PostgreSQL Container
+     ↓
+Named Volume
+```
+
+For a production-style workflow:
+
+```text
+                    PRODUCTION
+
+Source Code
+     ↓
+Dockerfile
+     ↓
+Build Image
+     ↓
+Tag Image
+     ↓
+Docker Hub
+     ↓
+docker-compose.prod.yml
+     ↓
+image: adeelakbar/fastapi-social-api:latest
+     ↓
+FastAPI Container
+     ↓
+Uvicorn without --reload
+
+PostgreSQL Container
+     ↓
+Named Volume
+```
+
+At this stage, the production configuration was tested locally.
+
+Actual final deployment to Ubuntu will be handled later together with the remaining deployment/CI/CD workflow rather than redeploying the application during the Docker-learning stage.
+
+---
+
+## Docker Commands Summary
+
+### Check Docker version
+
+```bash
+docker --version
+```
+
+### Show Docker information
+
+```bash
+docker info
+```
+
+### Build an image
+
+```bash
+docker build -t IMAGE_NAME .
+```
+
+Example:
+
+```bash
+docker build -t fastapi-social-api .
+```
+
+### List images
+
+```bash
+docker images
+```
+
+### Tag an image
+
+```bash
+docker tag SOURCE_IMAGE TARGET_IMAGE
+```
+
+Example:
+
+```bash
+docker tag social-media-api-api:latest adeelakbar/fastapi-social-api:latest
+```
+
+### Login to Docker Hub
+
+```bash
+docker login
+```
+
+### Logout
+
+```bash
+docker logout
+```
+
+### Push an image
+
+```bash
+docker push adeelakbar/fastapi-social-api:latest
+```
+
+### Pull an image
+
+```bash
+docker pull adeelakbar/fastapi-social-api:latest
+```
+
+### Start development Compose
+
+```bash
+docker compose up
+```
+
+### Build and start development Compose
+
+```bash
+docker compose up --build
+```
+
+### Start in detached mode
+
+```bash
+docker compose up -d
+```
+
+### View services
+
+```bash
+docker compose ps
+```
+
+### View logs
+
+```bash
+docker compose logs
+```
+
+### Follow logs
+
+```bash
+docker compose logs -f
+```
+
+### Execute a command inside API container
+
+```bash
+docker compose exec api COMMAND
+```
+
+### Apply Alembic migrations
+
+```bash
+docker compose exec api alembic upgrade head
+```
+
+### Stop development Compose
+
+```bash
+docker compose down
+```
+
+### Remove containers and named volumes
+
+```bash
+docker compose down -v
+```
+
+Use `-v` carefully because it removes the named database volume and its stored data.
+
+### Start production Compose
+
+```bash
+docker compose -f docker-compose.prod.yml up
+```
+
+### Start production Compose in detached mode
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### Stop production Compose
+
+```bash
+docker compose -f docker-compose.prod.yml down
+```
+
+---
+
+## Final Mental Model
+
+```text
+Dockerfile
+   ↓
+Defines how to build one application image
+
+Image
+   ↓
+Packaged application
+
+Container
+   ↓
+Running instance of an image
+
+Docker Hub
+   ↓
+Stores/distributes images
+
+Docker Compose
+   ↓
+Defines and manages multiple services
+
+FastAPI Container
+   ↕
+Docker Network
+   ↕
+PostgreSQL Container
+   ↓
+Named Volume
+   ↓
+Persistent database data
+```
+
+Development adds:
+
+```text
+Bind Mount
++
+--reload
+```
+
+Production removes those and runs the application from the packaged image.
+
+The main Docker workflow is:
+
+```text
+Code
+ ↓
+Dockerfile
+ ↓
+Build Image
+ ↓
+Test with Compose
+ ↓
+Tag Image
+ ↓
+Push to Registry
+ ↓
+Pull/Use Image in Production
+ ↓
+Run Container
+```
+
+---
